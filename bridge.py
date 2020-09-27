@@ -1,7 +1,7 @@
 import os
 import time
 from google.cloud import firestore
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime, timedelta
 from Bridge import diagnostic_test
@@ -101,13 +101,14 @@ def get_questions():
 def get_articles():
     all_articles = {}
     try:
-        articless_ref = db.collection(u'articles').stream()
-
+        articles_ref = db.collection(u'articles').stream()
+        
+        articles_arr = []
         for doc in articles_ref:
             article_dict = doc.to_dict()
-            all_articles[str(doc.id)] = article_dict
+            articles_arr.append(article_dict)
 
-        return all_articles
+        return jsonify(articles_arr)
 
     except:
         return {"status": 0, 'message': 'Something went wrong. Please try again later.'}    
