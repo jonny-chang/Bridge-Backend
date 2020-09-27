@@ -130,6 +130,78 @@ def analyze_answer_sentiment():
         return {'status': 0, 'message': 'An error occured. Please try again later.'}
 
 
+@app.route('generate-chat-token', methods=['GET'])
+def generate_chat_token():
+    email = request.args['email']
+
+    chat_state = db.collection(u'chat-token').document(u'state')
+    chat_state_dict = chat_state.get().to_dict()
+
+    user_info = db.collection(u'users').document(u'' + email).get().to_dict()
+    domestic = user_info['domestic']
+    economic = user_info['economic']
+    electoral = user_info['electoral']
+    environmental = user_info['environmental']
+    foreign = user_info['foreign']
+    health = user_info['health']
+    immigration = user_info['immigration'],
+    social = user_info['social']
+
+    try:
+        if chat_state_dict['in_chat'] < 2:
+            chat_state_dict['in_chat'] += 1
+            chat_state.set(chat_state_dict)
+
+            return {
+                'status': 1,
+                'num_ppl': chat_state_dict['in_chat'],
+                'token': chat_state_dict['token'],
+                'email': email,
+                'domestic_policy': domestic,
+                'economic': economic,
+                'electoral': electoral,
+                'environmental': environmental,
+                'foreign_policy': foreign,
+                'health': health,
+                'immigration': immigration,
+                'social': social
+            }
+
+        else:
+            new_token = random_string(20)
+
+            chat_state_dict['in_chat'] = 1
+            chat_state_dict['token'] = new_token
+            chat_state.set(chat_state_dict)
+
+            return {
+                'status': 1,
+                'num_ppl': chat_state_dict['in_chat'],
+                'token': new_token,
+                'email': email,
+                'domestic_policy': domestic,
+                'economic': economic,
+                'electoral': electoral,
+                'environmental': environmental,
+                'foreign_policy': foreign,
+                'health': health,
+                'immigration': immigration,
+                'social': social
+            }
+    except:
+        return {
+            'status': 0,
+            'message': 'Something went wrong. Please try again later.'
+        }
+
+
+def random_string(length):
+    letters = string.ascii_lowercase
+    result_str = ''.join(random.choice(letters) for i in range(length))
+
+    return result_str
+
+
 def check_password(password):
     if len(password) < 6:
         return False, "Password must be 6 characters or longer."
