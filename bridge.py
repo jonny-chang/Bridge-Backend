@@ -5,6 +5,8 @@ from flask import Flask, request
 from flask_cors import CORS
 from datetime import datetime, timedelta
 from Bridge import diagnostic_test
+import random
+import string
 
 app = Flask(__name__)
 CORS(app)
@@ -95,22 +97,6 @@ def get_questions():
         return {"status": 0, 'question': '', 'category': '', 'message': 'Something went wrong. Please try again later.'}
 
 
-@app.route("/get-articles", methods=["GET"])
-def get_articles():
-    all_articles = {}
-    try:
-        articless_ref = db.collection(u'articles').stream()
-
-        for doc in articles_ref:
-            article_dict = doc.to_dict()
-            all_articles[str(doc.id)] = article_dict
-
-        return all_articles
-
-    except:
-        return {"status": 0, 'message': 'Something went wrong. Please try again later.'}
-
-
 @app.route("/process-answer-sentiment", methods=["GET"])
 def analyze_answer_sentiment():
     used_other = request.args['used_other']
@@ -124,7 +110,7 @@ def analyze_answer_sentiment():
 
             keywords = question['keywords'].split()
             weights = [float(x) for x in question['weights'].split()]
-            
+
             keyword_dict = {}
 
             for i in range(0, len(keywords)):
@@ -146,7 +132,7 @@ def analyze_answer_sentiment():
         return {'status': 0, 'message': 'An error occured. Please try again later.'}
 
 
-@app.route('generate-chat-token', methods=['GET'])
+@app.route('/generate-chat-token', methods=['GET'])
 def generate_chat_token():
     email = request.args['email']
 
@@ -160,14 +146,13 @@ def generate_chat_token():
     environmental = user_info['environmental']
     foreign = user_info['foreign']
     health = user_info['health']
-    immigration = user_info['immigration'],
+    immigration = user_info['immigration']
     social = user_info['social']
 
     try:
         if chat_state_dict['in_chat'] < 2:
             chat_state_dict['in_chat'] += 1
             chat_state.set(chat_state_dict)
-
             return {
                 'status': 1,
                 'num_ppl': chat_state_dict['in_chat'],
@@ -184,8 +169,8 @@ def generate_chat_token():
             }
 
         else:
-            new_token = random_string(20)
-
+            new_token = ''.join(random.choice(string.ascii_letters) for i in range(10))
+            print(new_token)
             chat_state_dict['in_chat'] = 1
             chat_state_dict['token'] = new_token
             chat_state.set(chat_state_dict)
@@ -209,13 +194,6 @@ def generate_chat_token():
             'status': 0,
             'message': 'Something went wrong. Please try again later.'
         }
-
-
-def random_string(length):
-    letters = string.ascii_lowercase
-    result_str = ''.join(random.choice(letters) for i in range(length))
-
-    return result_str
 
 
 def check_password(password):
