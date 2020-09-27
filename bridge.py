@@ -105,7 +105,6 @@ def analyze_answer_sentiment():
     try:
         if used_other:
             other_text = request.args['other_text']
-            print(other_text)
 
             keywords = question['keywords'].split()
             weights = [float(x) for x in question['weights'].split()]
