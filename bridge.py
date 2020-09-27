@@ -113,19 +113,15 @@ def analyze_answer_sentiment():
 
             for i in range(0, len(keywords)):
                 keyword_dict[keywords[i]] = weights[i]
-                
-            print(keyword_dict)
 
             other_sent = diagnostic_test.get_answer_sentiment(other_text, keyword_dict)
-            print(other_sent)
-            
             update_sent(question['category'], other_sent, email)
-            print("YO")
+            print(other_sent)
 
             return {'status': 1, 'message': 'Success!'}
 
         else:
-            sent = request.args['sent_score']
+            sent = float(request.args['sent_score'])
             update_sent(question['category'], sent, email)
 
             return {'status': 1, 'message': 'Success!'}
