@@ -96,6 +96,22 @@ def get_questions():
     except:
         return {"status": 0, 'question': '', 'category': '', 'message': 'Something went wrong. Please try again later.'}
 
+    
+@app.route("/get-articles", methods=["GET"])
+def get_articles():
+    all_articles = {}
+    try:
+        articless_ref = db.collection(u'articles').stream()
+
+        for doc in articles_ref:
+            article_dict = doc.to_dict()
+            all_articles[str(doc.id)] = article_dict
+
+        return all_articles
+
+    except:
+        return {"status": 0, 'message': 'Something went wrong. Please try again later.'}    
+    
 
 @app.route("/process-answer-sentiment", methods=["GET"])
 def analyze_answer_sentiment():
