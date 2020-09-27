@@ -1,10 +1,14 @@
 import os
 import time
 from google.cloud import firestore
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime, timedelta
-from Bridge import diagnostic_test
+from Bridge import diagnostic_test, message_validation
+import random
+import string
+import json
+import requests
 
 app = Flask(__name__)
 CORS(app)
@@ -94,6 +98,23 @@ def get_questions():
     except:
         return {"status": 0, 'question': '', 'category': '', 'message': 'Something went wrong. Please try again later.'}
 
+    
+@app.route("/get-articles", methods=["GET"])
+def get_articles():
+    all_articles = {}
+    try:
+        articles_ref = db.collection(u'articles').stream()
+        
+        articles_arr = []
+        for doc in articles_ref:
+            article_dict = doc.to_dict()
+            articles_arr.append(article_dict)
+
+        return jsonify(articles_arr)
+
+    except:
+        return {"status": 0, 'message': 'Something went wrong. Please try again later.'}    
+    
 
 @app.route("/process-answer-sentiment", methods=["GET"])
 def analyze_answer_sentiment():
@@ -108,7 +129,7 @@ def analyze_answer_sentiment():
 
             keywords = question['keywords'].split()
             weights = [float(x) for x in question['weights'].split()]
-            
+
             keyword_dict = {}
 
             for i in range(0, len(keywords)):
@@ -128,6 +149,126 @@ def analyze_answer_sentiment():
 
     except:
         return {'status': 0, 'message': 'An error occured. Please try again later.'}
+
+
+@app.route('/generate-chat-token', methods=['GET'])
+def generate_chat_token():
+    email = request.args['email']
+
+    chat_state = db.collection(u'chat-token').document(u'state')
+    chat_state_dict = chat_state.get().to_dict()
+
+    user_info = db.collection(u'users').document(u'' + email).get().to_dict()
+    domestic = user_info['domestic']
+    economic = user_info['economic']
+    electoral = user_info['electoral']
+    environmental = user_info['environmental']
+    foreign = user_info['foreign']
+    health = user_info['health']
+    immigration = user_info['immigration']
+    social = user_info['social']
+
+    try:
+        if chat_state_dict['in_chat'] < 2:
+            chat_state_dict['in_chat'] += 1
+            chat_state.set(chat_state_dict)
+            return {
+                'status': 1,
+                'num_ppl': chat_state_dict['in_chat'],
+                'token': chat_state_dict['token'],
+                'email': email,
+                'domestic_policy': domestic,
+                'economic': economic,
+                'electoral': electoral,
+                'environmental': environmental,
+                'foreign_policy': foreign,
+                'health': health,
+                'immigration': immigration,
+                'social': social
+            }
+
+        else:
+            new_token = ''.join(random.choice(string.ascii_letters) for i in range(10))
+            print(new_token)
+            chat_state_dict['in_chat'] = 1
+            chat_state_dict['token'] = new_token
+            chat_state.set(chat_state_dict)
+
+            return {
+                'status': 1,
+                'num_ppl': chat_state_dict['in_chat'],
+                'token': new_token,
+                'email': email,
+                'domestic_policy': domestic,
+                'economic': economic,
+                'electoral': electoral,
+                'environmental': environmental,
+                'foreign_policy': foreign,
+                'health': health,
+                'immigration': immigration,
+                'social': social
+            }
+    except:
+        return {
+            'status': 0,
+            'message': 'Something went wrong. Please try again later.'
+        }
+
+
+@app.route("/create-conversation", methods=["GET"])
+def create_conversation():
+    user1 = request.args['user1']
+    user2 = request.args['user2']
+    most_different = request.args['different_subject']
+    most_similar = request.args['similar_subject']
+    conversation_id = request.args['conversation_id']
+    welcome_message = "Welcome to the chat! We hope you have a nice and educational discussion."
+    if most_similar and most_different:
+        welcome_message = "The topic you two have most differences in is: " + most_different + " and the topic you two agree on the most is: " + most_similar
+
+    app_id = "tvziCsZk"
+
+    url = "https://api.talkjs.com/v1/" + app_id + "/conversations/" + conversation_id
+
+    payload = "{\r\n    \"participants\": [\"" + str(user1) + "\", \"" + str(user2) +"\"],\r\n    \"subject\": \"Chat Room\",\r\n    \"welcomeMessages\": [\"" + welcome_message + "\"],\r\n    \"custom\": {\r\n        \"productId\": \"454545\"\r\n    }\r\n}"
+    headers = {
+        'Authorization': 'Bearer sk_test_Gg6riEPhRKUGhAluYSrVOyAA',
+        'Content-Type': 'application/json',
+        'Cookie': '__cfduid=d74cbb38aec0cd4148552f4703bc033ab1601210721'
+    }
+
+    response = requests.request("PUT", url, headers=headers, data=payload)
+
+    if response.status_code:
+        return {'status': 1, 'code': response.status_code, 'conversation_id': conversation_id}
+    else:
+        return {'status': 0, 'code': 'Error', 'conversation_id': conversation_id}    
+
+
+@app.route("/send-message", methods=["GET"])
+def send_message():
+    message = request.args['message']
+    user = request.args['user']
+    conversation_id = request.args['conversation_id']
+
+    app_id = "tvziCsZk"
+    url = "https://api.talkjs.com/v1/" + app_id + "/conversations/" + conversation_id + "/messages"
+
+    sent_result = message_validation.analyze_sentiment(message, True, True, True)
+
+    if sent_result['success']:
+        payload = "[{\"text\": \"" + message + "\", \"sender\": \"" + user + "\", \"type\": \"UserMessage\"}]"
+        headers = {
+            'Authorization': 'Bearer sk_test_Gg6riEPhRKUGhAluYSrVOyAA',
+            'Content-Type': 'application/json',
+            'Cookie': '__cfduid=d74cbb38aec0cd4148552f4703bc033ab1601210721'
+        }
+        response = requests.request("POST", url, headers=headers, data=payload)
+
+        return {"status": 1, "code": response.status_code}
+
+    else:
+        return {"status": 0, "code": sent_result}
 
 
 def check_password(password):
