@@ -4,7 +4,7 @@ from google.cloud import firestore
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime, timedelta
-from Bridge import diagnostic_test
+from Bridge import diagnostic_test, message_validation
 import random
 import string
 
@@ -241,6 +241,32 @@ def create_conversation():
         return {'status': 1, 'code': response.status_code, 'conversation_id': conversation_id}
     else:
         return {'status': 0, 'code': 'Error', 'conversation_id': conversation_id}    
+
+
+@app.route("/send-message", methods=["GET"])
+def send_message():
+    message = request.args['message']
+    user = request.args['user']
+    conversation_id = request.args['conversation_id']
+
+    app_id = "tvziCsZk"
+    url = "https://api.talkjs.com/v1/" + app_id + "/conversations/" + conversation_id
+
+    sent_result = message_validation.analyze_sentiment(message, True, True, True)
+
+    if sent_result['success']:
+        payload = "[{\"text\": \"" + message + "\", \"sender\": \"" + user + "\", \"type\": \"UserMessage\"}]"
+        headers = {
+            'Authorization': 'Bearer sk_test_Gg6riEPhRKUGhAluYSrVOyAA',
+            'Content-Type': 'application/json',
+            'Cookie': '__cfduid=d74cbb38aec0cd4148552f4703bc033ab1601210721'
+        }
+        response = requests.request("POST", url, headers=headers, data=payload)
+
+        return {"status": 1, "code": response.status_code}
+
+    else:
+        return {"status": 0, "code": sent_result, "message": jsonify(sent_result)}
 
 
 def check_password(password):
