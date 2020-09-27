@@ -79,18 +79,17 @@ def delete_user():
         return {"status": 0}
 
 
-@app.route("/get-question", methods=["GET"])
-def get_question():
-    question_id = request.args['id']
-
+@app.route("/get-questions", methods=["GET"])
+def get_questions():
+    all_questions = {}
     try:
-        questions_ref = db.collection(u'questions')
-        question = questions_ref.document(u'' + request.args['id']).get()
-        if not question.exists:
-            return {'status': 0, 'question': '', 'category': '', 'message': 'Question does not exist.'}
+        questions_ref = db.collection(u'questions').stream()
 
-        question_dict = question.to_dict()
-        return {'status': 1, 'question': question_dict['question'], 'category': question_dict['category'], 'message': 'Success.'}
+        for doc in questions_ref:
+            question_dict = doc.to_dict()
+            all_questions[str(doc.id)] = {'status': 1, 'question': question_dict['question'], 'category': question_dict['category'], 'message': 'Success.'}
+
+        return all_questions
 
     except:
         return {"status": 0, 'question': '', 'category': '', 'message': 'Something went wrong. Please try again later.'}
@@ -153,4 +152,4 @@ def update_sent(category, sentiment, email):
 
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=80, debug=True)
