@@ -213,6 +213,36 @@ def generate_chat_token():
         }
 
 
+@app.route("/create-conversation", methods=["GET"])
+def create_conversation():
+    user1 = request.args['user1']
+    user2 = request.args['user2']
+    most_different = request.args['different_subject']
+    most_similar = request.args['similar_subject']
+    conversation_id = request.args['conversation_id']
+    welcome_message = "Welcome to the chat! We hope you have a nice and educational discussion."
+    if most_similar and most_different:
+        welcome_message = "The topic you two have most differences in is: " + most_different + " and the topic you two agree on the most is: " + most_similar
+
+    app_id = "tvziCsZk"
+
+    url = "https://api.talkjs.com/v1/" + app_id + "/conversations/" + conversation_id
+
+    payload = "{\r\n    \"participants\": [\"" + str(user1) + "\", \"" + str(user2) +"\"],\r\n    \"subject\": \"Chat Room\",\r\n    \"welcomeMessages\": [\"" + welcome_message + "\"],\r\n    \"custom\": {\r\n        \"productId\": \"454545\"\r\n    }\r\n}"
+    headers = {
+        'Authorization': 'Bearer sk_test_Gg6riEPhRKUGhAluYSrVOyAA',
+        'Content-Type': 'application/json',
+        'Cookie': '__cfduid=d74cbb38aec0cd4148552f4703bc033ab1601210721'
+    }
+
+    response = requests.request("PUT", url, headers=headers, data=payload)
+
+    if response.status_code:
+        return {'status': 1, 'code': response.status_code, 'conversation_id': conversation_id}
+    else:
+        return {'status': 0, 'code': 'Error', 'conversation_id': conversation_id}    
+
+
 def check_password(password):
     if len(password) < 6:
         return False, "Password must be 6 characters or longer."
