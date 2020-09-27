@@ -8,7 +8,7 @@ client = language_v1.LanguageServiceClient()
 
 
 def get_answer_sentiment(text_content, words_of_interest):
-    lowercase_text_content = text_content.lowcase()
+    lowercase_text_content = text_content.lower()
     overall_sentiment_result = analyze_overall_sentiment(lowercase_text_content)
     word_sentiment_result = sample_analyze_entity_sentiment(lowercase_text_content, words_of_interest)
 
