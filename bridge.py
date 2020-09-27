@@ -7,6 +7,8 @@ from datetime import datetime, timedelta
 from Bridge import diagnostic_test, message_validation
 import random
 import string
+import json
+import requests
 
 app = Flask(__name__)
 CORS(app)
@@ -250,7 +252,7 @@ def send_message():
     conversation_id = request.args['conversation_id']
 
     app_id = "tvziCsZk"
-    url = "https://api.talkjs.com/v1/" + app_id + "/conversations/" + conversation_id
+    url = "https://api.talkjs.com/v1/" + app_id + "/conversations/" + conversation_id + "/messages"
 
     sent_result = message_validation.analyze_sentiment(message, True, True, True)
 
@@ -266,7 +268,7 @@ def send_message():
         return {"status": 1, "code": response.status_code}
 
     else:
-        return {"status": 0, "code": sent_result, "message": jsonify(sent_result)}
+        return {"status": 0, "code": sent_result}
 
 
 def check_password(password):
