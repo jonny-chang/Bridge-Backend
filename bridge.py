@@ -104,22 +104,23 @@ def analyze_answer_sentiment():
 
     try:
         if used_other:
-            print("YO")
             other_text = request.args['other_text']
 
             keywords = question['keywords'].split()
             weights = [float(x) for x in question['weights'].split()]
             
-            print(keywords)
-            print(weights)
-
             keyword_dict = {}
 
             for i in range(0, len(keywords)):
                 keyword_dict[keywords[i]] = weights[i]
+                
+            print(keyword_dict)
 
             other_sent = diagnostic_test.get_answer_sentiment(other_text, keyword_dict)
+            print(other_sent)
+            
             update_sent(question['category'], other_sent, email)
+            print("YO")
 
             return {'status': 1, 'message': 'Success!'}
 
