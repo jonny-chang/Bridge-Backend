@@ -8,8 +8,9 @@ client = language_v1.LanguageServiceClient()
 
 
 def get_answer_sentiment(text_content, words_of_interest):
-    overall_sentiment_result = analyze_overall_sentiment(text_content)
-    word_sentiment_result = sample_analyze_entity_sentiment(text_content, words_of_interest)
+    lowercase_text_content = text_content.lowcase()
+    overall_sentiment_result = analyze_overall_sentiment(lowercase_text_content)
+    word_sentiment_result = sample_analyze_entity_sentiment(lowercase_text_content, words_of_interest)
 
     word_sentiment_max_weight = 0.7
     # none of these values should be negative
@@ -38,7 +39,7 @@ def analyze_overall_sentiment(text_content):
     return (overall_sentiment_score, overall_sentiment_magnitude)
 
 
-def sample_analyze_entity_sentiment(text_content, words_of_interest):
+def sample_analyze_entity_sentiment(text_content, words_of_interest=None):
 
     # Available types: PLAIN_TEXT, HTML
     type_ = enums.Document.Type.PLAIN_TEXT
@@ -51,7 +52,9 @@ def sample_analyze_entity_sentiment(text_content, words_of_interest):
 
     response = client.analyze_entity_sentiment(document, encoding_type=encoding_type)
 
-    if isinstance(words_of_interest, dict):
+    if (words_of_interest is None):
+        return (0, 0, 0, 1)
+    elif isinstance(words_of_interest, dict):
         # Get overall sentiment of the input document
         overall_word_sentiment_score = 0
         overall_word_sentiment_magnitude = 0
@@ -98,4 +101,4 @@ def sample_analyze_entity_sentiment(text_content, words_of_interest):
 
 
 # test_content = """I love pears but hate onions"""
-# print(get_answer_sentiment(test_content, {"onions": 2,"pears": 3}))
+# print(get_answer_sentiment(test_content, {"onions": 5,"pears": 1}))

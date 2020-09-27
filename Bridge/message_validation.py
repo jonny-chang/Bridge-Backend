@@ -2,6 +2,8 @@
 TOP_THRESHOLD = 0.9
 BOTTOM_THRESHOLD = -0.8
 
+import xml.etree.ElementTree as ET
+
 from google.cloud import language_v1
 from google.cloud.language_v1 import enums, types
 
@@ -36,36 +38,33 @@ def profanity_check(text_content):
 
 def profanityAnalysis(text_content):
     start_index = 0
-    end_index = text_content.length
-
     text_content_arr = text_content.split()
+    end_index = len(text_content_arr)
 
-    profanity_baseline = predict_prob([text_content])[0]
+    profanity_baseline = predict_prob([text_content])[0]/(end_index-start_index)
 
-    profanity_split_1 = predict_prob([' '.join(text_content_arr[start_index:min(end_index//2 + 1, end_index - 1)])])
-    profanity_split_2 = predict_prob([' '.join(text_content_arr[max(1, end_index//2 - 1):end_index])])
-
+    profanity_split_1 = predict_prob([' '.join(text_content_arr[start_index:min(end_index//2 + 1, end_index - 1)])])[0]/(min(end_index//2 + 1, end_index - 1) - start_index)
+    profanity_split_2 = predict_prob([' '.join(text_content_arr[max(1, end_index//2 - 1):end_index])])[0]/(end_index-max(1, end_index//2 - 1))
     while(
         (end_index - start_index) > 1
-        and (profanity_baseline < profanity_split_1 or profanity_baseline < profanity_split_2)
+        and (profanity_baseline <= profanity_split_1 or profanity_baseline <= profanity_split_2)
     ):
         if profanity_split_1>=profanity_split_2:
             profanity_baseline = profanity_split_1
             start_index = start_index
-            end_index = min(end_index//2 + 1, end_index - 1)
+            end_index = min((start_index + end_index) // 2, end_index - 1)
         else:
             profanity_baseline = profanity_split_1
-            start_index = max(1, end_index // 2 - 1)
+            start_index = max(1,(start_index + end_index) // 2)
             end_index = end_index
-
         profanity_split_1 = predict_prob(
-            [' '.join(text_content_arr[start_index:min(end_index // 2 + 1, end_index - 1)])])
-        profanity_split_2 = predict_prob([' '.join(text_content_arr[max(1, end_index // 2 - 1):end_index])])
+            [' '.join(text_content_arr[start_index:min((start_index + end_index) // 2, end_index - 1)])])[0]/max(1,(min((start_index + end_index) // 2, end_index - 1) - start_index))
+        profanity_split_2 = predict_prob([' '.join(text_content_arr[max(1,(start_index + end_index) // 2):end_index])])[0]/max(1,(end_index-max(1,(start_index + end_index) // 2)))
 
     return (start_index, end_index)
 
 
-def analyze_sentiment(text_content, extra_recommendations=False):
+def analyze_sentiment(text_content, extra_recommendations=False, word_recommendations=False, ai_profanity_detection=False):
 
     result = {
         'success': True
@@ -81,16 +80,16 @@ def analyze_sentiment(text_content, extra_recommendations=False):
         result['message'] = "We have detected that the following profane word, please remove it."
         return result
 
-    module_name_1 = 'predict'
-    module_name_2 = 'predict_prob'
-    if (module_name_1 in sys.modules) and (module_name_2 in sys.modules) and predict is not None and predict_prob is not None:
+    if ai_profanity_detection and predict is not None and predict_prob is not None:
         if predict([text_content])[0] == 1:
             result['success'] = False
+            result['failureType'] = 'profanity'
             profanity_bounds_tuple = profanityAnalysis(text_content)
-            result['beginOffset'] = profanity_bounds_tuple[0]
-            result['length'] = profanity_bounds_tuple[1]-profanity_bounds_tuple[0]
-            result['content'] = text_content.split()[profanity_bounds_tuple[0]:profanity_bounds_tuple[1]].join(" ")
-            result['message'] = "We have detected that the following is profane, please remove it."
+            text_content_arr = text_content.split()
+            result['beginOffset'] = len(" ".join(text_content_arr[:profanity_bounds_tuple[0]]))
+            result['length'] = len(" ".join(text_content_arr[profanity_bounds_tuple[0]:profanity_bounds_tuple[1]]))
+            result['content'] = " ".join(text_content_arr[profanity_bounds_tuple[0]:profanity_bounds_tuple[1]])
+            result['message'] = "We have detected that the following is profane, please change or remove it."
             return result
 
 
@@ -127,9 +126,28 @@ def analyze_sentiment(text_content, extra_recommendations=False):
                         extreme_entity_score = entity_sentiment.score
                 if extreme_entity is not None:
                     if sentence.sentiment.score < BOTTOM_THRESHOLD:
-                        result['recommendation'] = "Your reference to " + extreme_entity + " is particularly negative"
+                        result['recommendation'] = "Your mention of " + extreme_entity + " is particularly negative"
                     elif sentence.sentiment.score > TOP_THRESHOLD:
-                        result['recommendation'] = "Your reference to " + extreme_entity + " is particularly positive"
+                        result['recommendation'] = "Your mention of " + extreme_entity + " is particularly positive"
+
+            if word_recommendations:
+                root = ET.parse('sentiments.xml').getroot()
+
+                max_sum = 0
+                word_of_interest = None
+                for index, word in enumerate(sentence.text.content.split()):
+                    xml_objects = root.findall("./word[@form='" + word + "']")
+
+                    sum = 0
+                    for xml_object in xml_objects:
+                        if ('polarity' in xml_object.attrib) and ('subjectivity' in xml_object.attrib):
+                            sum = sum + abs(float(xml_object.attrib['polarity'])) + abs(float(xml_object.attrib['subjectivity']))
+                    if sum > max_sum:
+                        max_sum = sum
+                        word_of_interest = word
+                if word_of_interest is not None:
+                    result['wordChange'] = "We recommend that you change the word " + word_of_interest + "."
+                    result['wordChangeStart'] = sentence.text.begin_offset + sentence.text.content.find(word_of_interest)
 
             result['success'] = False
             result['failureType'] = 'sentiment'
@@ -137,13 +155,12 @@ def analyze_sentiment(text_content, extra_recommendations=False):
             result['length'] = len(sentence.text.content)
             result['content'] = sentence.text.content
             if sentence.sentiment.score < BOTTOM_THRESHOLD:
-                result['message'] = "This sentence has a strong negative sentiment try to make it more neutral and add more of an explanation."
+                result['message'] = "This sentence has a strong negative sentiment try to make it more neutral."
             elif sentence.sentiment.score > TOP_THRESHOLD:
-                result['message'] = "This sentence has a strong positive sentiment try to make it more neutral and add more of an explanation.."
+                result['message'] = "This sentence has a strong positive sentiment try to make it more neutral."
             return result
 
     return result
 
-
-# test_content = """I disagree with this because of your opinion on god and his worth"""
-# print(analyze_sentiment(test_content, extra_recommendations=True))
+# test_content = """I am thinking a lot right now sir. You are a stupid person"""
+# print(analyze_sentiment(test_content, extra_recommendations=True, word_recommendations=True))
